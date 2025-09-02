@@ -1,0 +1,125 @@
+# HTTP redirect to HTTPS
+server {
+    listen 80;
+    listen [::]:80;
+    server_name DOMAIN_PLACEHOLDER;
+    
+    location /.well-known/acme-challenge/ {
+        root /var/www/certbot;
+    }
+    
+    location / {
+        return 301 https://$server_name$request_uri;
+    }
+}
+
+# HTTPS Configuration
+server {
+    listen 443 ssl http2;
+    listen [::]:443 ssl http2;
+    server_name DOMAIN_PLACEHOLDER;
+
+    # SSL Configuration
+    ssl_certificate /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/DOMAIN_PLACEHOLDER/privkey.pem;
+    
+    # SSL Security Settings
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # Security Headers
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    
+    # Increase upload size limit
+    client_max_body_size 100M;
+    
+    # Timeouts for long-running requests
+    proxy_connect_timeout 600;
+    proxy_send_timeout 600;
+    proxy_read_timeout 600;
+    send_timeout 600;
+    
+    # Frontend (Next.js)
+    location / {
+        proxy_pass http://frontend:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # API and GraphQL
+    location /graphql {
+        proxy_pass http://api:4000/graphql;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # WebSocket support for subscriptions
+        proxy_set_header Sec-WebSocket-Protocol $http_sec_websocket_protocol;
+        proxy_set_header Sec-WebSocket-Extensions $http_sec_websocket_extensions;
+        proxy_set_header Sec-WebSocket-Key $http_sec_websocket_key;
+        proxy_set_header Sec-WebSocket-Version $http_sec_websocket_version;
+    }
+    
+    # API health check endpoint
+    location /health {
+        proxy_pass http://api:4000/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+    
+    # Webhook endpoint
+    location /webhook {
+        proxy_pass http://webhook:9000/;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # Pass GitHub headers
+        proxy_set_header X-GitHub-Event $http_x_github_event;
+        proxy_set_header X-Hub-Signature-256 $http_x_hub_signature_256;
+        proxy_set_header X-GitHub-Delivery $http_x_github_delivery;
+        
+        # Increase buffer sizes for webhook payloads
+        proxy_buffer_size 128k;
+        proxy_buffers 4 256k;
+        proxy_busy_buffers_size 256k;
+    }
+    
+    # Static files cache (optional)
+    location ~* \.(jpg|jpeg|png|gif|ico|css|js|svg|woff|woff2|ttf|eot)$ {
+        proxy_pass http://frontend:3000;
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+    }
+    
+    # Rate limiting (optional)
+    limit_req_zone $binary_remote_addr zone=general:10m rate=10r/s;
+    limit_req zone=general burst=20 nodelay;
+    
+    # Gzip compression
+    gzip on;
+    gzip_vary on;
+    gzip_min_length 1024;
+    gzip_types text/plain text/css text/xml text/javascript application/json application/javascript application/xml+rss application/rss+xml application/atom+xml image/svg+xml text/javascript application/vnd.ms-fontobject application/x-font-ttf font/opentype;
+}

@@ -1,0 +1,41 @@
+# Environment files
+.env
+.env.local
+.env.production
+env/.env.production
+
+# Secrets - NEVER commit these
+secrets/*
+!secrets/README.md
+
+# SSL certificates
+certbot/conf/*
+certbot/www/*
+!certbot/conf/.gitkeep
+!certbot/www/.gitkeep
+
+# Nginx runtime config
+nginx/sites-enabled/default.conf
+
+# Docker volumes
+postgres_data/
+cache_data/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Logs
+*.log
+logs/
+
+# Backup files
+*.backup
+*.bak
+*~

@@ -1,0 +1,14 @@
+{
+  "name": "github-webhook-handler",
+  "version": "1.0.0",
+  "description": "GitHub webhook handler for auto-deployment",
+  "main": "webhook-server.ts",
+  "scripts": {
+    "start": "bun run webhook-server.ts",
+    "dev": "bun --watch webhook-server.ts"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
